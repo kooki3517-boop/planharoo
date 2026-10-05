@@ -131,4 +131,7 @@ function renderStats(){
 $("#gear").onclick=renderManage;$("#statsBtn").onclick=renderStats;$("#todayTab").onclick=()=>{todayTab.classList.add("on");historyTab.classList.remove("on");center=new Date();center.setHours(12,0,0,0);renderHome()};$("#historyTab").onclick=renderHistory;
 function easter(){if(Math.random()>=.05)return;let imgs=["assets/20403.jpg","assets/20460.jpg","assets/20574.webp","assets/20603.jpg","assets/20784.webp","assets/20964.jpg","assets/22550.jpg","assets/23443.jpg","assets/23842.jpg","assets/34450.jpg","assets/34794.jpg","assets/38062.jpg","assets/39653.jpg","assets/40251.jpg","assets/5309.jpg","assets/50776.jpg","assets/50805.jpg","assets/51420.jpg","assets/58412.jpg","assets/57339.jpg","assets/57077.jpg","assets/57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",700)}
 renderHome();easter();
+
+// Initial screen
+renderHome();
 </script></body></html>
