@@ -37,11 +37,16 @@ input[type=text]{width:100%;border:1px solid var(--line);background:white;border
 .statRow{padding:10px 0;border-top:1px solid var(--line)}.statRow:first-child{border-top:0}
 .statName{display:flex;justify-content:space-between;gap:8px;font-size:13px}
 .statBar{height:6px;background:#eee6e1;border-radius:8px;overflow:hidden;margin-top:6px}.statBar i{display:block;height:100%;background:#d7b5bc;border-radius:8px}
+
+/* Statistics: visually distinguish calculated result values from section headings */
+.statBig{font-family:Arial,"Noto Sans KR",sans-serif;font-weight:800;letter-spacing:-.03em}
+.statResult{font-family:Arial,"Noto Sans KR",sans-serif;font-weight:500;color:var(--muted);font-size:13px;line-height:1.45}
+.statResultStrong{font-family:Arial,"Noto Sans KR",sans-serif;font-weight:700;color:var(--ink);font-size:16px;line-height:1.45;margin-top:7px}
 </style><link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="theme-color" content="#f7f3ef"></head>
-<body><div class="app"><header><div><h1 id="appTitle" class="homeQuote">“나는 계획이 다 있구나.”</h1><div class="sub" id="monthLabel"></div></div><div style="display:flex;align-items:center"><button class="icon" id="statsBtn" aria-label="월간 통계">▥</button><button class="icon" id="gear">⚙</button></div></header><main id="main"></main><nav><button id="todayTab" class="on">오늘 계획</button><button id="historyTab">지난 기록</button></nav></div><div class="overlay" id="success"><div class="success">SUCCESS!</div></div><div class="inputModal" id="inputModal"><div class="inputSheet"><h3 id="inputTitle">할 일 추가</h3><input id="inputField" type="text" autocomplete="off"><div class="inputActions"><button id="inputCancel">취소</button><button class="primary" id="inputOk">확인</button></div></div></div><div class="flash" id="flash"><img id="flashImg"></div>
+<body><div class="app"><header><div><h1 id="appTitle" class="homeQuote">“나는 계획이 다 있구나.”</h1><div class="sub" id="monthLabel"></div></div><div style="display:flex;align-items:center"><button class="icon" id="statsBtn" aria-label="월간 통계">▥</button><button class="icon" id="gear">⚙</button></div></header><main id="main"></main><nav><button id="todayTab" class="on">오늘 계획</button></nav></div><div class="overlay" id="success"><div class="success">SUCCESS!</div></div><div class="inputModal" id="inputModal"><div class="inputSheet"><h3 id="inputTitle">할 일 추가</h3><input id="inputField" type="text" autocomplete="off"><div class="inputActions"><button id="inputCancel">취소</button><button class="primary" id="inputOk">확인</button></div></div></div><div class="flash" id="flash"><img id="flashImg"></div>
 <script>
 const DEFAULTS=["일어나서 영양제 챙겨 먹기","8시간 자기","감사 일기 쓰기","명상하기","독서하기 (10분 이상)","운동하기","건강식 한 끼","가계부 쓰기"];
 const $=s=>document.querySelector(s), main=$("#main");
@@ -114,10 +119,10 @@ function renderStats(){
  <div class=section><div class=statLabel>이번 달 계획 달성률</div><div class=statBig>${pct}%</div><div class=bar><i style="width:${pct}%"></i></div></div>
  <div class=section><div class=sectitle><span>SUCCESS한 날</span><span>${successDays}일</span></div><div class=statLabel>하루 계획을 전부 완료한 날</div></div>
  <div class=section><div class=sectitle><span>가장 많이 성공한 고정 루틴</span></div>
- ${ranks.length?`<b>${ranks[0].name}</b><div class=statLabel style="margin-top:5px">${ranks[0].done}회 완료</div>`:'<div class=statLabel>아직 기록이 없어요.</div>'}</div>
+ ${ranks.length?`<div class=statResultStrong>${ranks[0].name}</div><div class=statResult>${ranks[0].done}회 완료</div>`:'<div class=statLabel>아직 기록이 없어요.</div>'}</div>
  <div class=section><div class=sectitle><span>고정 루틴별 달성</span></div><div id=routineStats></div></div></div>`;
  let box=$("#routineStats");
- for(let x of ranks){let rp=x.possible?Math.round(x.done/x.possible*100):0;box.insertAdjacentHTML("beforeend",`<div class=statRow><div class=statName><span>${x.name}</span><span>${x.done}회 · ${rp}%</span></div><div class=statBar><i style="width:${rp}%"></i></div></div>`)}
+ for(let x of ranks){let rp=x.possible?Math.round(x.done/x.possible*100):0;box.insertAdjacentHTML("beforeend",`<div class=statRow><div class=statName><span>${x.name}</span><span class=statResult>${x.done}회 · ${rp}%</span></div><div class=statBar><i style="width:${rp}%"></i></div></div>`)}
  $("#statsBack").onclick=renderHome;
  $("#prevM").onclick=()=>{statMonth.setMonth(statMonth.getMonth()-1);renderStats()};
  $("#nextM").onclick=()=>{statMonth.setMonth(statMonth.getMonth()+1);renderStats()};
