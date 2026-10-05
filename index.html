@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>오늘은 이렇게,</title>
 <style>
-:root{--bg:#f7f3ef;--card:#fbf9f6;--ink:#55504d;--muted:#9b9490;--line:#e5ded9;--pink:#ead7da;--pink2:#f2e6e7;--red:#ff1010}
+:root{--bg:#f5f0eb;--card:#fbf7f3;--ink:#494440;--muted:#8d8580;--line:#ddd3cd;--pink:#e5cbd0;--pink2:#eedcdf;--red:#ff1010}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,"Noto Sans KR",sans-serif;color:var(--ink);height:100dvh;overflow:hidden}
 button,input{font:inherit;color:inherit}.app{height:100dvh;max-width:520px;margin:auto;display:flex;flex-direction:column}
 header{padding:18px 18px 9px;display:flex;align-items:center;justify-content:space-between}h1{font-size:24px;margin:0;font-weight:700;letter-spacing:-1px}.homeQuote{font-family:"Nanum Myeongjo","Noto Serif KR","Batang","바탕",serif;font-size:23px;font-weight:400;letter-spacing:-.5px}
@@ -30,11 +30,18 @@ input[type=text]{width:100%;border:1px solid var(--line);background:white;border
 .inputModal.show{display:flex}.inputSheet{width:100%;max-width:520px;background:var(--bg);border-radius:22px 22px 0 0;padding:20px 18px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 28px #443a3320}
 .inputSheet h3{margin:0 0 14px;font-size:18px}.inputSheet input{font-size:16px;outline:none}
 .inputActions{display:flex;gap:8px;margin-top:12px}.inputActions button{flex:1;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px}.inputActions .primary{background:var(--pink2);border-color:#dec8cc}
+
+.statsHead{display:flex;align-items:center;justify-content:space-between;margin:6px 0 12px}
+.statsHead button{border:0;background:none;font-size:20px;padding:8px}
+.statBig{font-size:32px;font-weight:700;margin:5px 0}.statLabel{font-size:12px;color:var(--muted)}
+.statRow{padding:10px 0;border-top:1px solid var(--line)}.statRow:first-child{border-top:0}
+.statName{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.statBar{height:6px;background:#eee6e1;border-radius:8px;overflow:hidden;margin-top:6px}.statBar i{display:block;height:100%;background:#d7b5bc;border-radius:8px}
 </style><link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <meta name="theme-color" content="#f7f3ef"></head>
-<body><div class="app"><header><div><h1 id="appTitle" class="homeQuote">“나는 계획이 다 있구나.”</h1><div class="sub" id="monthLabel"></div></div><button class="icon" id="gear">⚙</button></header><main id="main"></main><nav><button id="todayTab" class="on">오늘 계획</button><button id="historyTab">지난 기록</button></nav></div><div class="overlay" id="success"><div class="success">SUCCESS!</div></div><div class="inputModal" id="inputModal"><div class="inputSheet"><h3 id="inputTitle">할 일 추가</h3><input id="inputField" type="text" autocomplete="off"><div class="inputActions"><button id="inputCancel">취소</button><button class="primary" id="inputOk">확인</button></div></div></div><div class="flash" id="flash"><img id="flashImg"></div>
+<body><div class="app"><header><div><h1 id="appTitle" class="homeQuote">“나는 계획이 다 있구나.”</h1><div class="sub" id="monthLabel"></div></div><div style="display:flex;align-items:center"><button class="icon" id="statsBtn" aria-label="월간 통계">▥</button><button class="icon" id="gear">⚙</button></div></header><main id="main"></main><nav><button id="todayTab" class="on">오늘 계획</button><button id="historyTab">지난 기록</button></nav></div><div class="overlay" id="success"><div class="success">SUCCESS!</div></div><div class="inputModal" id="inputModal"><div class="inputSheet"><h3 id="inputTitle">할 일 추가</h3><input id="inputField" type="text" autocomplete="off"><div class="inputActions"><button id="inputCancel">취소</button><button class="primary" id="inputOk">확인</button></div></div></div><div class="flash" id="flash"><img id="flashImg"></div>
 <script>
 const DEFAULTS=["일어나서 영양제 챙겨 먹기","8시간 자기","감사 일기 쓰기","명상하기","독서하기 (10분 이상)","운동하기","건강식 한 끼","가계부 쓰기"];
 const $=s=>document.querySelector(s), main=$("#main");
@@ -86,7 +93,37 @@ function renderManage(){$("#appTitle").className="homeQuote";$("#appTitle").text
 function move(i,n){let j=i+n;if(j<0||j>=data.routines.length)return;[data.routines[i],data.routines[j]]=[data.routines[j],data.routines[i]];tone(560,.07,.18);save();renderManage()}
 function renderHistory(){$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";todayTab.classList.remove("on");historyTab.classList.add("on");let keys=Object.keys(data.days).sort().reverse();main.innerHTML=`<div class=screen><h2 style="font-size:19px;margin-top:6px">지난 기록</h2><div class=historyGrid id=hg></div></div>`;if(!keys.length)$("#hg").innerHTML='<div class=sub>아직 기록이 없어요.</div>';keys.forEach(k=>{let [a,t]=counts(k),e=document.createElement("div");e.className="hist";e.innerHTML=`<b>${k.slice(5).replace("-","월 ")}일</b><div class=ratio>${a}<span class=sub> / ${t}</span></div><div class=bar><i style="width:${t?a/t*100:0}%"></i></div>`;e.onclick=()=>renderDetail(k);$("#hg").append(e)});setMonth()}
 function setMonth(){let d=center;$("#monthLabel").textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월`}
-$("#gear").onclick=renderManage;$("#todayTab").onclick=()=>{todayTab.classList.add("on");historyTab.classList.remove("on");center=new Date();center.setHours(12,0,0,0);renderHome()};$("#historyTab").onclick=renderHistory;
+
+let statMonth=new Date(); statMonth.setDate(1);
+function monthKeys(d){
+ let y=d.getFullYear(),m=d.getMonth(),last=new Date(y,m+1,0).getDate(),arr=[];
+ for(let n=1;n<=last;n++)arr.push(`${y}-${pad(m+1)}-${pad(n)}`); return arr;
+}
+function renderStats(){
+ $("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
+ let keys=monthKeys(statMonth), existing=keys.filter(k=>data.days[k]), checked=0,total=0,successDays=0;
+ let routineCounts={}; data.routines.forEach(r=>routineCounts[r.id]={name:r.t,done:0,possible:0});
+ for(let k of existing){
+   let dd=data.days[k], c=counts(k); checked+=c[0]; total+=c[1]; if(c[1]>0&&c[0]===c[1])successDays++;
+   for(let r of data.routines){ if(r.on){routineCounts[r.id].possible++; if(dd.routineDone?.[r.id])routineCounts[r.id].done++;} }
+ }
+ let pct=total?Math.round(checked/total*100):0;
+ let ranks=Object.values(routineCounts).filter(x=>x.possible>0).sort((a,b)=>b.done-a.done);
+ main.innerHTML=`<div class=screen><button class=back id=statsBack>← 메인</button>
+ <div class=statsHead><button id=prevM>‹</button><b>${statMonth.getFullYear()}년 ${statMonth.getMonth()+1}월</b><button id=nextM>›</button></div>
+ <div class=section><div class=statLabel>이번 달 계획 달성률</div><div class=statBig>${pct}%</div><div class=bar><i style="width:${pct}%"></i></div></div>
+ <div class=section><div class=sectitle><span>SUCCESS한 날</span><span>${successDays}일</span></div><div class=statLabel>하루 계획을 전부 완료한 날</div></div>
+ <div class=section><div class=sectitle><span>가장 많이 성공한 고정 루틴</span></div>
+ ${ranks.length?`<b>${ranks[0].name}</b><div class=statLabel style="margin-top:5px">${ranks[0].done}회 완료</div>`:'<div class=statLabel>아직 기록이 없어요.</div>'}</div>
+ <div class=section><div class=sectitle><span>고정 루틴별 달성</span></div><div id=routineStats></div></div></div>`;
+ let box=$("#routineStats");
+ for(let x of ranks){let rp=x.possible?Math.round(x.done/x.possible*100):0;box.insertAdjacentHTML("beforeend",`<div class=statRow><div class=statName><span>${x.name}</span><span>${x.done}회 · ${rp}%</span></div><div class=statBar><i style="width:${rp}%"></i></div></div>`)}
+ $("#statsBack").onclick=renderHome;
+ $("#prevM").onclick=()=>{statMonth.setMonth(statMonth.getMonth()-1);renderStats()};
+ $("#nextM").onclick=()=>{statMonth.setMonth(statMonth.getMonth()+1);renderStats()};
+}
+
+$("#gear").onclick=renderManage;$("#statsBtn").onclick=renderStats;$("#todayTab").onclick=()=>{todayTab.classList.add("on");historyTab.classList.remove("on");center=new Date();center.setHours(12,0,0,0);renderHome()};$("#historyTab").onclick=renderHistory;
 function easter(){if(Math.random()>=.05)return;let imgs=["assets/20403.jpg","assets/20460.jpg","assets/20574.webp","assets/20603.jpg","assets/20784.webp","assets/20964.jpg","assets/22550.jpg","assets/23443.jpg","assets/23842.jpg","assets/34450.jpg","assets/34794.jpg","assets/38062.jpg","assets/39653.jpg","assets/40251.jpg","assets/5309.jpg","assets/50776.jpg","assets/50805.jpg","assets/51420.jpg","assets/58412.jpg","assets/57339.jpg","assets/57077.jpg","assets/57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",700)}
 renderHome();easter();
 </script></body></html>
