@@ -1,0 +1,1 @@
+index.html을 웹호스팅(Netlify/GitHub Pages 등)에 올리면 됩니다. 데이터는 각 기기의 localStorage에 저장됩니다. 사진 플래시는 새로고침 시 5% 확률로 약 0.9초 표시됩니다.
