@@ -51,7 +51,7 @@ input[type=text]{width:100%;border:1px solid var(--line);background:white;border
 const DEFAULTS=["일어나서 영양제 챙겨 먹기","8시간 자기","감사 일기 쓰기","명상하기","독서하기 (10분 이상)","운동하기","건강식 한 끼","가계부 쓰기"];
 const $=s=>document.querySelector(s), main=$("#main");
 let data=JSON.parse(localStorage.getItem("planharoo_v4")||"null")||{routines:DEFAULTS.map((t,i)=>({id:"r"+i,t,on:true})),days:{}}; if(!data.recent)data.recent={};
-function save(){localStorage.setItem("planharoo_v4",JSON.stringify(data))} function touchDay(k){data.recent[k]=Date.now();save()}
+function save(){localStorage.setItem("planharoo_v4",JSON.stringify(data))} function touchDay(k){save()}
 const pad=n=>String(n).padStart(2,"0"), key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 function dayData(k){if(!data.days[k]) data.days[k]={routineDone:{},tasks:[]};return data.days[k]}
 function activeR(){return data.routines.filter(x=>x.on)}
