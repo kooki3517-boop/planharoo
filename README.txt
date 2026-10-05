@@ -1,1 +1,1 @@
-GitHub Pages용 파일입니다. 저장소 루트에 index.html과 assets 폴더를 그대로 업로드하세요.
+GitHub Pages 업로드: 이 폴더 안의 index.html과 assets 폴더를 저장소 루트에 올리세요.
