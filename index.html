@@ -10,7 +10,7 @@ button,input{font:inherit;color:inherit}.app{height:100dvh;max-width:520px;margi
 header{padding:18px 18px 9px;display:flex;align-items:center;justify-content:space-between}h1{font-size:24px;margin:0;font-weight:700;letter-spacing:-1px}.homeQuote{font-family:"Nanum Myeongjo","Noto Serif KR","Batang","바탕",serif;font-size:23px;font-weight:400;letter-spacing:-.5px}
 .icon{border:0;background:transparent;font-size:22px;padding:7px}.sub{font-size:12px;color:var(--muted)}
 main{flex:1;min-height:0}.home{height:100%;display:flex;flex-direction:column}.dateRow{padding:0 18px 10px;display:flex;justify-content:space-between;align-items:center}
-.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:7px;padding:3px 12px 12px;flex:1;min-height:0;overflow:hidden}
+.cards{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;gap:7px;padding:3px 12px 12px;flex:1;min-height:0;overflow:hidden}
 .daycard{min-width:0;min-height:0;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:9px 8px;box-shadow:0 2px 10px #7766550a;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;overflow:hidden}
 .daycard.today{border-color:#ddc4c8}.dow{font-size:10px;color:var(--muted);white-space:nowrap}.dateNum{font-size:21px;font-weight:700;margin:2px 0}.ratio{font-size:16px;margin-top:5px}.bar{height:5px;background:#eee8e4;border-radius:9px;overflow:hidden;margin-top:8px}.bar i{display:block;height:100%;background:#d9bfc4;border-radius:9px}
 .mini{display:block;margin-top:6px;font-size:9px;line-height:1.35;color:#827b77;overflow:hidden;max-height:27px}.mini div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hint{display:none}
@@ -91,11 +91,11 @@ let center=new Date();center.setHours(12,0,0,0);
 function renderHome(){$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
 main.innerHTML='<div class="home"><div class="dateRow"><span class="sub">최근 계획</span><button class="icon" id="cal">▣</button></div><div class="cards" id="cards"></div></div>';
 let box=$("#cards"), today=new Date();today.setHours(12,0,0,0);
-let candidates=[];
-for(let off=-30;off<=30;off++){let d=new Date(today);d.setDate(d.getDate()+off);let k=key(d);if(data.days[k]||off>=0&&off<=8)candidates.push({d,k,stamp:data.recent?.[k]||0})}
-candidates.sort((a,b)=>b.stamp-a.stamp || Math.abs(a.d-today)-Math.abs(b.d-today));
-let seen=new Set(), list=[];
-for(let x of candidates){if(!seen.has(x.k)){seen.add(x.k);list.push(x)}if(list.length===9)break}
+let candidates=Object.keys(data.days).map(k=>{let d=new Date(k+"T12:00:00");return {d,k}});
+let todayKey=key(today);
+if(!candidates.some(x=>x.k===todayKey))candidates.push({d:new Date(today),k:todayKey});
+candidates.sort((a,b)=>b.k.localeCompare(a.k));
+let list=candidates.slice(0,1);
 for(let {d,k} of list){
  let dd=dayData(k),[done,total]=counts(k),r=activeR(),pct=total?done/total*100:0;
  let taskTexts=dd.tasks.map(x=>(x.done?"✓ ":"○ ")+x.t);
