@@ -96,8 +96,6 @@ function renderHome(){$("#appTitle").className="homeQuote";$("#appTitle").textCo
 main.innerHTML='<div class="home"><div class="dateRow"><span class="sub">최근 계획</span><button class="icon" id="cal">▣</button></div><div class="cards" id="cards"></div></div>';
 let box=$("#cards"), today=new Date();today.setHours(12,0,0,0);
 let candidates=Object.keys(data.days).map(k=>{let d=new Date(k+"T12:00:00");return {d,k}});
-let todayKey=key(today);
-if(!candidates.some(x=>x.k===todayKey))candidates.push({d:new Date(today),k:todayKey});
 candidates.sort((a,b)=>b.k.localeCompare(a.k));
 let list=candidates.slice(0,9);
 for(let {d,k} of list){
@@ -147,7 +145,7 @@ function renderStats(){
 }
 
 $("#gear").onclick=renderManage;$("#statsBtn").onclick=renderStats;$("#todayTab").onclick=()=>{todayTab.classList.add("on");center=new Date();center.setHours(12,0,0,0);renderHome()};
-function easter(){if(Math.random()>=.05)return;let imgs=["20403.jpg","20460.jpg","20574.webp","20603.jpg","20784.webp","20964.jpg","22550.jpg","23443.jpg","23842.jpg","34450.jpg","34794.jpg","38062.jpg","39653.jpg","40251.jpg","5309.jpg","50776.jpg","50805.jpg","51420.jpg","58412.jpg","57339.jpg","57077.jpg","57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",700)}
+function easter(){if(Math.random()>=.05)return;let imgs=["20403.jpg","20460.jpg","20574.webp","20603.jpg","20784.webp","20964.jpg","22550.jpg","23443.jpg","23842.jpg","34450.jpg","34794.jpg","38062.jpg","39653.jpg","40251.jpg","5309.jpg","50776.jpg","50805.jpg","51420.jpg","58412.jpg","57339.jpg","57077.jpg","57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",1000)}
 async function loadCloud(){
  const {data:rows,error}=await sb.from("plans").select("data").eq("user_id",currentUser.id).eq("plan_date","1970-01-01").maybeSingle();
  if(error){console.error(error);data=freshData();return}
