@@ -56,14 +56,28 @@ const SUPABASE_URL="https://owliextjtdyjumswcdtw.supabase.co";
 const SUPABASE_KEY="sb_publishable_5sEMTCvftCD4ImO51u6DBg_7D3lR3Kt";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const PEOPLE={hyena:{name:"전혜나",email:"hyena@planharoo.local"},jiyong:{name:"오지용",email:"jiyong@planharoo.local"}};
-let currentUser=null,saveTimer=null;
+let currentUser=null,saveTimer=null,saveRunning=false,savePending=false;
 const DEFAULTS=["일어나서 영양제 챙겨 먹기","8시간 자기","감사 일기 쓰기","명상하기","독서하기 (10분 이상)","운동하기","건강식 한 끼","가계부 쓰기"];
 const $=s=>document.querySelector(s), main=$("#main");
 function freshData(){return {routines:DEFAULTS.map((t,i)=>({id:"r"+i,t,on:true})),days:{},recent:{}}}
 let data=freshData();
 function save(){
  if(!currentUser)return;
- clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{await sb.from("plans").upsert({user_id:currentUser.id,plan_date:"1970-01-01",data},{onConflict:"user_id,plan_date"})},180);
+ clearTimeout(saveTimer);
+ saveTimer=setTimeout(flushSave,180);
+}
+async function flushSave(){
+ if(!currentUser)return;
+ if(saveRunning){savePending=true;return}
+ saveRunning=true;
+ try{
+  do{
+   savePending=false;
+   const snapshot=JSON.parse(JSON.stringify(data));
+   const {error}=await sb.from("plans").upsert({user_id:currentUser.id,plan_date:"1970-01-01",data:snapshot},{onConflict:"user_id,plan_date"});
+   if(error){console.error("저장 실패:",error);savePending=true}
+  }while(savePending)
+ }finally{saveRunning=false}
 }
 function touchDay(k){data.recent[k]=Date.now();save()}
 const pad=n=>String(n).padStart(2,"0"), key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
