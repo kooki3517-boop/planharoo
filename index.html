@@ -173,7 +173,7 @@ function renderStats(){
  <div class=section><div class=statLabel>이번 달 계획 달성률</div><div class=statBig>${pct}%</div><div class=bar><i style="width:${pct}%"></i></div></div>
  <div class=section><div class=sectitle><span>SUCCESS한 날</span><span>${successDays}일</span></div><div class=statLabel>하루 계획을 전부 완료한 날</div></div>
  <div class=section><div class=sectitle><span>가장 많이 성공한 고정 루틴</span></div>
- ${ranks.length?`<div class=statResultStrong>${ranks[0].name}</div><div class=statResult>${ranks[0].done}회 완료</div>`:'<div class=statLabel>아직 기록이 없어요.</div>'}</div>
+ ${ranks.length?`<div class=statResultStrong>${ranks.filter(x=>x.done===ranks[0].done).map(x=>x.name).join(" · ")}</div><div class=statResult>${ranks[0].done}회 완료</div>`:'<div class=statLabel>아직 기록이 없어요.</div>'}</div>
  <div class=section><div class=sectitle><span>고정 루틴별 달성</span></div><div id=routineStats></div></div></div>`;
  let box=$("#routineStats");
  for(let x of ranks){let rp=x.possible?Math.round(x.done/x.possible*100):0;box.insertAdjacentHTML("beforeend",`<div class=statRow><div class=statName><span>${x.name}</span><span class=statResult>${x.done}회 · ${rp}%</span></div><div class=statBar><i style="width:${rp}%"></i></div></div>`)}
