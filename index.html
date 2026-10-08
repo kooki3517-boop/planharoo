@@ -57,28 +57,52 @@ const SUPABASE_KEY="sb_publishable_5sEMTCvftCD4ImO51u6DBg_7D3lR3Kt";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
 const PEOPLE={hyena:{name:"전혜나",email:"hyena@planharoo.local"},jiyong:{name:"오지용",email:"jiyong@planharoo.local"}};
 let currentUser=null,saveTimer=null,saveRunning=false,savePending=false;
+let saveRevision=0,saveRetryTimer=null,saveFailureShown=false;
+const pendingKey=()=>currentUser?"planharoo-pending-"+currentUser.id:null;
+function readPending(){try{const v=localStorage.getItem(pendingKey());return v?JSON.parse(v):null}catch(e){return null}}
+function storePending(snapshot){try{localStorage.setItem(pendingKey(),JSON.stringify(snapshot));return true}catch(e){console.error("임시 저장 실패:",e);return false}}
+function clearPending(){try{localStorage.removeItem(pendingKey())}catch(e){}}
 const DEFAULTS=["일어나서 영양제 챙겨 먹기","8시간 자기","감사 일기 쓰기","명상하기","독서하기 (10분 이상)","운동하기","건강식 한 끼","가계부 쓰기"];
 const $=s=>document.querySelector(s), main=$("#main");
 function freshData(){return {routines:DEFAULTS.map((t,i)=>({id:"r"+i,t,on:true})),days:{},recent:{}}}
 let data=freshData();
 function save(){
  if(!currentUser)return;
+ saveRevision++;
+ const backedUp=storePending(data);
+ if(!backedUp&&!saveFailureShown){saveFailureShown=true;alert("기기에 임시 저장하지 못했습니다. 저장 공간을 확인해 주세요.")}
  clearTimeout(saveTimer);
+ clearTimeout(saveRetryTimer);
  saveTimer=setTimeout(flushSave,180);
 }
 async function flushSave(){
  if(!currentUser)return;
+ clearTimeout(saveTimer);
+ clearTimeout(saveRetryTimer);
  if(saveRunning){savePending=true;return}
  saveRunning=true;
  try{
   do{
    savePending=false;
+   const revision=saveRevision;
+   const userId=currentUser.id;
    const snapshot=JSON.parse(JSON.stringify(data));
-   const {error}=await sb.from("plans").upsert({user_id:currentUser.id,plan_date:"1970-01-01",data:snapshot},{onConflict:"user_id,plan_date"});
-   if(error){console.error("저장 실패:",error);savePending=true}
+   let error;
+   try{({error}=await sb.from("plans").upsert({user_id:userId,plan_date:"1970-01-01",data:snapshot},{onConflict:"user_id,plan_date"}))}
+   catch(e){error=e}
+   if(error){
+    console.error("저장 실패:",error);
+    if(!saveFailureShown){saveFailureShown=true;alert("서버 저장에 실패했습니다. 변경 내용은 이 기기에 임시 보관하고 자동으로 다시 저장합니다.")}
+    saveRetryTimer=setTimeout(flushSave,3000);
+    return;
+   }
+   if(revision===saveRevision&&currentUser?.id===userId){clearPending();saveFailureShown=false}
+   else savePending=true;
   }while(savePending)
  }finally{saveRunning=false}
 }
+window.addEventListener("online",()=>{if(currentUser&&readPending())flushSave()});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&currentUser&&readPending())flushSave()});
 function touchDay(k){data.recent[k]=Date.now();save()}
 const pad=n=>String(n).padStart(2,"0"), key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 function dayData(k){if(!data.days[k]) data.days[k]={routineDone:{},tasks:[]};return data.days[k]}
@@ -161,10 +185,21 @@ function renderStats(){
 $("#gear").onclick=renderManage;$("#statsBtn").onclick=renderStats;$("#todayTab").onclick=()=>{todayTab.classList.add("on");center=new Date();center.setHours(12,0,0,0);renderHome()};
 function easter(){if(Math.random()>=.05)return;let imgs=["20403.jpg","20460.jpg","20574.webp","20603.jpg","20784.webp","20964.jpg","22550.jpg","23443.jpg","23842.jpg","34450.jpg","34794.jpg","38062.jpg","39653.jpg","40251.jpg","5309.jpg","50776.jpg","50805.jpg","51420.jpg","58412.jpg","57339.jpg","57077.jpg","57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",1000)}
 async function loadCloud(){
- const {data:rows,error}=await sb.from("plans").select("data").eq("user_id",currentUser.id).eq("plan_date","1970-01-01").maybeSingle();
- if(error){console.error(error);data=freshData();return}
- data=rows?.data||freshData();if(!data.recent)data.recent={};if(!data.routines)data.routines=freshData().routines;if(!data.days)data.days={};
- if(!rows)save();
+ const pending=readPending();
+ let rows,error;
+ try{({data:rows,error}=await sb.from("plans").select("data").eq("user_id",currentUser.id).eq("plan_date","1970-01-01").maybeSingle())}
+ catch(e){error=e}
+ if(error){
+  console.error("불러오기 실패:",error);
+  if(!pending){alert("서버에서 기록을 불러오지 못했습니다. 기록 보호를 위해 다시 연결한 뒤 시도해 주세요.");return false}
+ }
+ data=pending||rows?.data||freshData();
+ if(!data.recent)data.recent={};
+ if(!data.routines)data.routines=freshData().routines;
+ if(!data.days)data.days={};
+ if(pending){saveRevision++;flushSave()}
+ else if(!rows&&!error)save();
+ return true;
 }
 function showAuthMessage(t){$("#authMsg").textContent=t||""}
 let chosenPerson=null;
@@ -179,8 +214,8 @@ async function enterAccount(){
    if(!made.data.session){showAuthMessage("계정은 만들어졌지만 이메일 확인 설정 때문에 바로 로그인할 수 없습니다. Supabase 인증 설정에서 이메일 확인을 꺼야 합니다.");$("#authSubmit").disabled=false;return}
    login=made.data;
  }
- currentUser=login.user;await loadCloud();$("#authGate").style.display="none";renderHome();easter();$("#authSubmit").disabled=false;
+ currentUser=login.user;if(!await loadCloud()){$("#authSubmit").disabled=false;return}$("#authGate").style.display="none";renderHome();easter();$("#authSubmit").disabled=false;
 }
 $("#authSubmit").onclick=enterAccount;$("#authPassword").addEventListener("keydown",e=>{if(e.key==="Enter")enterAccount()});
-(async()=>{let {data:{session}}=await sb.auth.getSession();if(session?.user){currentUser=session.user;await loadCloud();$("#authGate").style.display="none";renderHome();easter()}})();
+(async()=>{let {data:{session}}=await sb.auth.getSession();if(session?.user){currentUser=session.user;if(!await loadCloud())return;$("#authGate").style.display="none";renderHome();easter()}})();
 </script></body></html>
