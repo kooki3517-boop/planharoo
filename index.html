@@ -124,6 +124,50 @@ async function saveAndReturn(button){
 }
 window.addEventListener("online",()=>{if(currentUser&&readPending())flushSave()});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden"&&currentUser&&readPending())flushSave()});
+
+// Keep one browser-history guard for editable screens. A hardware back gesture
+// confirms the same cloud save as the on-screen return button.
+let editScreen=null, backSaving=false;
+function guardEditScreen(type){
+ editScreen=type;
+ if(!history.state?.planEditGuard)history.pushState({planEditGuard:true},"",location.href);
+}
+window.addEventListener("popstate",async()=>{
+ if(!editScreen||!currentUser)return;
+ history.pushState({planEditGuard:true},"",location.href);
+ if(backSaving)return;
+ backSaving=true;
+ try{
+  const ok=await flushSave();
+  if(ok){editScreen=null;renderHome()}
+  else alert("저장에 실패했습니다. 현재 화면을 유지합니다. 인터넷 연결을 확인하고 다시 시도해 주세요.");
+ }finally{backSaving=false}
+});
+function enableDaySwipe(k){
+ const screen=main.querySelector(".screen");
+ if(!screen)return;
+ let startX=0,startY=0,tracking=false,changing=false;
+ screen.addEventListener("touchstart",e=>{
+  if(e.touches.length!==1||e.target.closest("button,input,.inputModal")){tracking=false;return}
+  tracking=true;startX=e.touches[0].clientX;startY=e.touches[0].clientY;
+ },{passive:true});
+ screen.addEventListener("touchend",async e=>{
+  if(!tracking||changing||!e.changedTouches.length)return;
+  tracking=false;
+  const dx=e.changedTouches[0].clientX-startX,dy=e.changedTouches[0].clientY-startY;
+  if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy)*1.5)return;
+  const dates=Object.keys(data.days).sort();
+  const pos=dates.indexOf(k);
+  const target=dates[pos+(dx<0?1:-1)];
+  if(!target)return;
+  changing=true;
+  try{
+   const ok=await flushSave();
+   if(ok){renderDetail(target)}
+   else alert("저장에 실패해 날짜를 이동하지 않았어요. 다시 시도해 주세요.");
+  }finally{changing=false}
+ },{passive:true});
+}
 function touchDay(k){data.recent[k]=Date.now();save()}
 const pad=n=>String(n).padStart(2,"0"), key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 function dayData(k){if(!data.days[k]) data.days[k]={routineDone:{},tasks:[]};return data.days[k]}
@@ -151,7 +195,7 @@ $("#dateCancel").onclick=()=>{$("#dateModal").classList.remove("show");if(dateRe
 $("#dateOk").onclick=()=>{let v=$("#dateField").value;$("#dateModal").classList.remove("show");if(dateResolve){dateResolve(v);dateResolve=null}};
 
 let center=new Date();center.setHours(12,0,0,0);
-function renderHome(){$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
+function renderHome(){editScreen=null;$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
 main.innerHTML='<div class="home"><div class="dateRow"><span class="sub">최근 계획</span><button class="icon" id="cal">▣</button></div><div class="cards" id="cards"></div></div>';
 let box=$("#cards"), today=new Date();today.setHours(12,0,0,0);
 let candidates=Object.keys(data.days).map(k=>{let d=new Date(k+"T12:00:00");return {d,k}});
@@ -168,8 +212,8 @@ for(let {d,k} of list){
 }
 $("#cal").onclick=async()=>{let v=await askDate("새 계획 날짜 선택",key(today));if(v){if(!data.days[v])data.days[v]={routineDone:{},tasks:[]};touchDay(v);renderHome()}};
 setMonth()}
-function renderDetail(k){$("#appTitle").className="";$("#appTitle").textContent="오늘은 이렇게,";let d=dayData(k),r=activeR(),[done,total]=counts(k);main.innerHTML=`<div class=screen><button class=back id=back>← 저장하고 돌아가기</button><div class=dateRow style="padding:4px 0 8px"><b>${k}</b><div class=dateTools><span class=progress>${done}/${total} 완료</span><button class=dateDelete id=editDate aria-label="날짜 수정" title="날짜 수정">✎</button><button class=dateDelete id=deleteDay aria-label="이 날짜 기록 전체 삭제" title="이 날짜 기록 전체 삭제">⌫</button></div></div><div class=section><div class=sectitle><span>고정 루틴</span><span class=progress>${r.filter(x=>d.routineDone[x.id]).length}/${r.length}</span></div><div id=rs></div></div><div class=section><div class=sectitle><span>오늘만 할 일</span><span class=progress>${d.tasks.filter(x=>x.done).length}/${d.tasks.length}</span></div><div id=ts></div><button class=add id=add>+ 할 일 추가</button></div></div>`;$("#back").onclick=()=>saveAndReturn($("#back"));r.forEach(x=>{$("#rs").insertAdjacentHTML("beforeend",`<label class="task ${d.routineDone[x.id]?"done":""}"><input type=checkbox data-r="${x.id}" ${d.routineDone[x.id]?"checked":""}><span class=txt>${x.t}</span></label>`)});d.tasks.forEach((x,i)=>{$("#ts").insertAdjacentHTML("beforeend",`<div class="task ${x.done?"done":""}"><input type=checkbox data-t="${i}" ${x.done?"checked":""}><span class=txt>${x.t}</span><button class=smallbtn data-e="${i}" aria-label="수정" title="수정">✎</button><button class=smallbtn data-x="${i}" aria-label="삭제" title="삭제">×</button></div>`)});main.querySelectorAll("[data-r]").forEach(el=>el.onchange=()=>{let was=counts(k)[0]===counts(k)[1]&&counts(k)[1]>0;d.routineDone[el.dataset.r]=el.checked;tone(el.checked?760:470,.11,.28);touchDay(k);maybeSuccess(k,was);renderDetail(k)});main.querySelectorAll("[data-t]").forEach(el=>el.onchange=()=>{let was=counts(k)[0]===counts(k)[1]&&counts(k)[1]>0;d.tasks[+el.dataset.t].done=el.checked;tone(el.checked?760:470,.11,.28);touchDay(k);maybeSuccess(k,was);renderDetail(k)});main.querySelectorAll("[data-e]").forEach(el=>el.onclick=()=>{let i=+el.dataset.e;(async()=>{let v=await askInput("할 일 수정",d.tasks[i].t);if(v?.trim()){d.tasks[i].t=v.trim();tone();touchDay(k);renderDetail(k)}})()});main.querySelectorAll("[data-x]").forEach(el=>el.onclick=()=>{d.tasks.splice(+el.dataset.x,1);tone(380,.08,.2);touchDay(k);renderDetail(k)});$("#editDate").onclick=async()=>{let nk=await askDate("날짜 수정",k);if(!nk||nk===k)return;if(data.days[nk]){alert("이미 계획이 있는 날짜입니다. 다른 날짜를 선택해 주세요.");return}data.days[nk]=data.days[k];delete data.days[k];if(data.recent[k]){data.recent[nk]=data.recent[k];delete data.recent[k]}save();tone();renderDetail(nk)};$("#deleteDay").onclick=()=>{if(confirm(k+" 날짜의 계획 전체를 삭제할까요?")){delete data.days[k];delete data.recent[k];save();tone(380,.08,.2);renderHome()}};$("#add").onclick=()=>{(async()=>{let v=await askInput("오늘 할 일 추가");if(v?.trim()){d.tasks.push({t:v.trim(),done:false});tone();touchDay(k);renderDetail(k)}})()}}
-function renderManage(){$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";main.innerHTML=`<div class=screen><button class=back id=back>← 저장하고 돌아가기</button><h2 style="font-size:19px">고정 루틴 관리</h2><div class=sub>켜 둔 항목은 새로운 날짜의 하루 계획 상단에 표시됩니다.</div><div class=section id=mr></div><button class=add id=addR>+ 새 고정 루틴 추가하기</button></div>`;$("#back").onclick=()=>saveAndReturn($("#back"));data.routines.forEach((x,i)=>{$("#mr").insertAdjacentHTML("beforeend",`<div class=manageRow><span class=drag>☰</span><input class=toggle type=checkbox data-on="${i}" ${x.on?"checked":""}><span class=txt>${x.t}</span><button class=smallbtn data-up="${i}">↑</button><button class=smallbtn data-down="${i}">↓</button><button class=smallbtn data-re="${i}">✎</button><button class=smallbtn data-rx="${i}">×</button></div>`)});main.querySelectorAll("[data-on]").forEach(e=>e.onchange=()=>{data.routines[+e.dataset.on].on=e.checked;tone(e.checked?760:470,.11,.28);save();renderManage()});main.querySelectorAll("[data-re]").forEach(e=>e.onclick=()=>{let i=+e.dataset.re;(async()=>{let v=await askInput("고정 루틴 수정",data.routines[i].t);if(v?.trim()){data.routines[i].t=v.trim();tone();save();renderManage()}})()});main.querySelectorAll("[data-rx]").forEach(e=>e.onclick=()=>{data.routines.splice(+e.dataset.rx,1);tone(380,.08,.2);save();renderManage()});main.querySelectorAll("[data-up]").forEach(e=>e.onclick=()=>move(+e.dataset.up,-1));main.querySelectorAll("[data-down]").forEach(e=>e.onclick=()=>move(+e.dataset.down,1));$("#addR").onclick=()=>{(async()=>{let v=await askInput("새 고정 루틴");if(v?.trim()){data.routines.push({id:"r"+Date.now(),t:v.trim(),on:true});tone();save();renderManage()}})()}}
+function renderDetail(k){guardEditScreen("day");$("#appTitle").className="";$("#appTitle").textContent="오늘은 이렇게,";let d=dayData(k),r=activeR(),[done,total]=counts(k);main.innerHTML=`<div class=screen><button class=back id=back>← 저장하고 돌아가기</button><div class=dateRow style="padding:4px 0 8px"><b>${k}</b><div class=dateTools><span class=progress>${done}/${total} 완료</span><button class=dateDelete id=editDate aria-label="날짜 수정" title="날짜 수정">✎</button><button class=dateDelete id=deleteDay aria-label="이 날짜 기록 전체 삭제" title="이 날짜 기록 전체 삭제">⌫</button></div></div><div class=section><div class=sectitle><span>고정 루틴</span><span class=progress>${r.filter(x=>d.routineDone[x.id]).length}/${r.length}</span></div><div id=rs></div></div><div class=section><div class=sectitle><span>오늘만 할 일</span><span class=progress>${d.tasks.filter(x=>x.done).length}/${d.tasks.length}</span></div><div id=ts></div><button class=add id=add>+ 할 일 추가</button></div></div>`;$("#back").onclick=()=>saveAndReturn($("#back"));r.forEach(x=>{$("#rs").insertAdjacentHTML("beforeend",`<label class="task ${d.routineDone[x.id]?"done":""}"><input type=checkbox data-r="${x.id}" ${d.routineDone[x.id]?"checked":""}><span class=txt>${x.t}</span></label>`)});d.tasks.forEach((x,i)=>{$("#ts").insertAdjacentHTML("beforeend",`<div class="task ${x.done?"done":""}"><input type=checkbox data-t="${i}" ${x.done?"checked":""}><span class=txt>${x.t}</span><button class=smallbtn data-e="${i}" aria-label="수정" title="수정">✎</button><button class=smallbtn data-x="${i}" aria-label="삭제" title="삭제">×</button></div>`)});main.querySelectorAll("[data-r]").forEach(el=>el.onchange=()=>{let was=counts(k)[0]===counts(k)[1]&&counts(k)[1]>0;d.routineDone[el.dataset.r]=el.checked;tone(el.checked?760:470,.11,.28);touchDay(k);maybeSuccess(k,was);renderDetail(k)});main.querySelectorAll("[data-t]").forEach(el=>el.onchange=()=>{let was=counts(k)[0]===counts(k)[1]&&counts(k)[1]>0;d.tasks[+el.dataset.t].done=el.checked;tone(el.checked?760:470,.11,.28);touchDay(k);maybeSuccess(k,was);renderDetail(k)});main.querySelectorAll("[data-e]").forEach(el=>el.onclick=()=>{let i=+el.dataset.e;(async()=>{let v=await askInput("할 일 수정",d.tasks[i].t);if(v?.trim()){d.tasks[i].t=v.trim();tone();touchDay(k);renderDetail(k)}})()});main.querySelectorAll("[data-x]").forEach(el=>el.onclick=()=>{d.tasks.splice(+el.dataset.x,1);tone(380,.08,.2);touchDay(k);renderDetail(k)});$("#editDate").onclick=async()=>{let nk=await askDate("날짜 수정",k);if(!nk||nk===k)return;if(data.days[nk]){alert("이미 계획이 있는 날짜입니다. 다른 날짜를 선택해 주세요.");return}data.days[nk]=data.days[k];delete data.days[k];if(data.recent[k]){data.recent[nk]=data.recent[k];delete data.recent[k]}save();tone();renderDetail(nk)};$("#deleteDay").onclick=()=>{if(confirm(k+" 날짜의 계획 전체를 삭제할까요?")){delete data.days[k];delete data.recent[k];save();tone(380,.08,.2);renderHome()}};$("#add").onclick=()=>{(async()=>{let v=await askInput("오늘 할 일 추가");if(v?.trim()){d.tasks.push({t:v.trim(),done:false});tone();touchDay(k);renderDetail(k)}})()};enableDaySwipe(k)}
+function renderManage(){guardEditScreen("manage");$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";main.innerHTML=`<div class=screen><button class=back id=back>← 저장하고 돌아가기</button><h2 style="font-size:19px">고정 루틴 관리</h2><div class=sub>켜 둔 항목은 새로운 날짜의 하루 계획 상단에 표시됩니다.</div><div class=section id=mr></div><button class=add id=addR>+ 새 고정 루틴 추가하기</button></div>`;$("#back").onclick=()=>saveAndReturn($("#back"));data.routines.forEach((x,i)=>{$("#mr").insertAdjacentHTML("beforeend",`<div class=manageRow><span class=drag>☰</span><input class=toggle type=checkbox data-on="${i}" ${x.on?"checked":""}><span class=txt>${x.t}</span><button class=smallbtn data-up="${i}">↑</button><button class=smallbtn data-down="${i}">↓</button><button class=smallbtn data-re="${i}">✎</button><button class=smallbtn data-rx="${i}">×</button></div>`)});main.querySelectorAll("[data-on]").forEach(e=>e.onchange=()=>{data.routines[+e.dataset.on].on=e.checked;tone(e.checked?760:470,.11,.28);save();renderManage()});main.querySelectorAll("[data-re]").forEach(e=>e.onclick=()=>{let i=+e.dataset.re;(async()=>{let v=await askInput("고정 루틴 수정",data.routines[i].t);if(v?.trim()){data.routines[i].t=v.trim();tone();save();renderManage()}})()});main.querySelectorAll("[data-rx]").forEach(e=>e.onclick=()=>{data.routines.splice(+e.dataset.rx,1);tone(380,.08,.2);save();renderManage()});main.querySelectorAll("[data-up]").forEach(e=>e.onclick=()=>move(+e.dataset.up,-1));main.querySelectorAll("[data-down]").forEach(e=>e.onclick=()=>move(+e.dataset.down,1));$("#addR").onclick=()=>{(async()=>{let v=await askInput("새 고정 루틴");if(v?.trim()){data.routines.push({id:"r"+Date.now(),t:v.trim(),on:true});tone();save();renderManage()}})()}}
 function move(i,n){let j=i+n;if(j<0||j>=data.routines.length)return;[data.routines[i],data.routines[j]]=[data.routines[j],data.routines[i]];tone(560,.07,.18);save();renderManage()}
 function renderHistory(){$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";todayTab.classList.remove("on");historyTab.classList.add("on");let keys=Object.keys(data.days).sort().reverse();main.innerHTML=`<div class=screen><h2 style="font-size:19px;margin-top:6px">지난 기록</h2><div class=historyGrid id=hg></div></div>`;if(!keys.length)$("#hg").innerHTML='<div class=sub>아직 기록이 없어요.</div>';keys.forEach(k=>{let [a,t]=counts(k),e=document.createElement("div");e.className="hist";e.innerHTML=`<b>${k.slice(5).replace("-","월 ")}일</b><div class=ratio>${a}<span class=sub> / ${t}</span></div><div class=bar><i style="width:${t?a/t*100:0}%"></i></div>`;e.onclick=()=>renderDetail(k);$("#hg").append(e)});setMonth()}
 function setMonth(){let d=center;$("#monthLabel").textContent=`${d.getFullYear()}년 ${d.getMonth()+1}월`}
@@ -204,7 +248,7 @@ function renderStats(){
 }
 
 $("#gear").onclick=renderManage;$("#statsBtn").onclick=renderStats;$("#todayTab").onclick=()=>{todayTab.classList.add("on");center=new Date();center.setHours(12,0,0,0);renderHome()};
-function easter(){if(Math.random()>=.05)return;let imgs=["20403.jpg","20460.jpg","20574.webp","20603.jpg","20784.webp","20964.jpg","22550.jpg","23443.jpg","23842.jpg","34450.jpg","34794.jpg","38062.jpg","39653.jpg","40251.jpg","5309.jpg","50776.jpg","50805.jpg","51420.jpg","58412.jpg","57339.jpg","57077.jpg","57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",1000)}
+function easter(){if(Math.random()>=.05)return;let imgs=["20403.jpg","20460.jpg","20603.jpg","20784.webp","20964.jpg","22550.jpg","23443.jpg","23842.jpg","34450.jpg","34794.jpg","38062.jpg","39653.jpg","40251.jpg","50776.jpg","50805.jpg","51420.jpg","58412.jpg","57339.jpg","57077.jpg","57061.jpg"];let f=$("#flash");$("#flashImg").src=imgs[Math.floor(Math.random()*imgs.length)];f.style.display="flex";setTimeout(()=>f.style.display="none",1000)}
 async function loadCloud(){
  const pending=readPending();
  let rows,error;
