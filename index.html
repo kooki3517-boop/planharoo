@@ -127,32 +127,38 @@ document.addEventListener("visibilitychange",()=>{if(document.visibilityState===
 
 // Keep one browser-history guard for editable screens. A hardware back gesture
 // confirms the same cloud save as the on-screen return button.
-let editScreen=null, backSaving=false;
+let editScreen=null, backSaving=false, swipeAnimating=false;
 function guardEditScreen(type){
+ // Push only when entering an editor from a non-editor screen.
+ // Re-rendering the same editor (checkboxes etc.) must not add history entries.
+ if(!editScreen){
+  history.pushState({planEditGuard:true},"",location.href);
+ }
  editScreen=type;
- if(!history.state?.planEditGuard)history.pushState({planEditGuard:true},"",location.href);
 }
 window.addEventListener("popstate",async()=>{
  if(!editScreen||!currentUser)return;
+ // The browser has already stepped back. Restore an in-app history entry
+ // immediately so a failed save cannot close the web shortcut.
  history.pushState({planEditGuard:true},"",location.href);
  if(backSaving)return;
  backSaving=true;
  try{
   const ok=await flushSave();
-  if(ok){editScreen=null;renderHome()}
+  if(ok){renderHome()}
   else alert("저장에 실패했습니다. 현재 화면을 유지합니다. 인터넷 연결을 확인하고 다시 시도해 주세요.");
  }finally{backSaving=false}
 });
 function enableDaySwipe(k){
  const screen=main.querySelector(".screen");
  if(!screen)return;
- let startX=0,startY=0,tracking=false,changing=false;
+ let startX=0,startY=0,tracking=false;
  screen.addEventListener("touchstart",e=>{
-  if(e.touches.length!==1||e.target.closest("button,input,.inputModal")){tracking=false;return}
+  if(e.touches.length!==1||e.target.closest("button,input")){tracking=false;return}
   tracking=true;startX=e.touches[0].clientX;startY=e.touches[0].clientY;
  },{passive:true});
  screen.addEventListener("touchend",async e=>{
-  if(!tracking||changing||!e.changedTouches.length)return;
+  if(!tracking||swipeAnimating||!e.changedTouches.length)return;
   tracking=false;
   const dx=e.changedTouches[0].clientX-startX,dy=e.changedTouches[0].clientY-startY;
   if(Math.abs(dx)<65||Math.abs(dx)<Math.abs(dy)*1.5)return;
@@ -160,12 +166,38 @@ function enableDaySwipe(k){
   const pos=dates.indexOf(k);
   const target=dates[pos+(dx<0?1:-1)];
   if(!target)return;
-  changing=true;
+  swipeAnimating=true;
   try{
    const ok=await flushSave();
-   if(ok){renderDetail(target)}
-   else alert("저장에 실패해 날짜를 이동하지 않았어요. 다시 시도해 주세요.");
-  }finally{changing=false}
+   if(!ok){
+    alert("저장에 실패해 날짜를 이동하지 않았어요. 다시 시도해 주세요.");
+    return;
+   }
+   // Visibly slide the outgoing date card and bring the next card in.
+   const direction=dx<0?-1:1;
+   screen.style.willChange="transform, opacity";
+   screen.style.transition="transform 170ms ease-in, opacity 170ms ease-in";
+   screen.style.transform=`translateX(${direction*100}%)`;
+   screen.style.opacity=".35";
+   await new Promise(resolve=>setTimeout(resolve,175));
+   renderDetail(target);
+   const incoming=main.querySelector(".screen");
+   if(!incoming)return;
+   incoming.style.willChange="transform, opacity";
+   incoming.style.transition="none";
+   incoming.style.transform=`translateX(${-direction*100}%)`;
+   incoming.style.opacity=".35";
+   // Two frames ensure the browser paints the starting position.
+   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   incoming.style.transition="transform 220ms ease-out, opacity 220ms ease-out";
+   incoming.style.transform="translateX(0)";
+   incoming.style.opacity="1";
+   await new Promise(resolve=>setTimeout(resolve,230));
+   incoming.style.transition="";
+   incoming.style.transform="";
+   incoming.style.opacity="";
+   incoming.style.willChange="";
+  }finally{swipeAnimating=false}
  },{passive:true});
 }
 function touchDay(k){data.recent[k]=Date.now();save()}
@@ -195,7 +227,7 @@ $("#dateCancel").onclick=()=>{$("#dateModal").classList.remove("show");if(dateRe
 $("#dateOk").onclick=()=>{let v=$("#dateField").value;$("#dateModal").classList.remove("show");if(dateResolve){dateResolve(v);dateResolve=null}};
 
 let center=new Date();center.setHours(12,0,0,0);
-function renderHome(){editScreen=null;$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
+function renderHome(){editScreen=null;if(history.state?.planEditGuard)history.replaceState({planHome:true},"",location.href);$("#appTitle").className="homeQuote";$("#appTitle").textContent="“나는 계획이 다 있구나.”";
 main.innerHTML='<div class="home"><div class="dateRow"><span class="sub">최근 계획</span><button class="icon" id="cal">▣</button></div><div class="cards" id="cards"></div></div>';
 let box=$("#cards"), today=new Date();today.setHours(12,0,0,0);
 let candidates=Object.keys(data.days).map(k=>{let d=new Date(k+"T12:00:00");return {d,k}});
